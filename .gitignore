@@ -1,0 +1,12 @@
+# Local secrets and environment files
+flutter_app/lib/firebase_options.secret.dart
+esp32_firmware/src/main/config.secrets.h
+firebase_backend/.env
+firebase_backend/*.local.json
+firebase_backend/*.local.yaml
+firebase_backend/*.local.properties
+firebase_backend/.firebaserc.local
+**/.env
+**/*.local.json
+**/*.local.yaml
+**/*.local.properties

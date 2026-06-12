@@ -1,0 +1,37 @@
+# File: flutter_app/pubspec.yaml
+# Manifest Flutter SmartHome Core. Hanya berisi dependency yang langsung
+# dipakai di Fase 1 MVP (StreamBuilder + RTDB + Auth). Dependency tambahan
+# (intl, provider, dll) bisa ditambah saat dibutuhkan fitur baru.
+
+name: smarthome_core
+description: SmartHome Core - Android Mobile Companion (Fase 1 MVP)
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+  flutter: '>=3.19.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase Core - inisialisasi global
+  firebase_core: ^3.6.0
+
+  # Realtime Database - kanal kontrol saklar dan schedules (acuan: PRD.md bab 2)
+  firebase_database: ^11.1.5
+
+  # Auth - basis RBAC, currentUserUid pada DashboardViewModel
+  firebase_auth: ^5.3.1
+
+  # Cupertino icons - dipakai pada Switch alarm dan ikon umum
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

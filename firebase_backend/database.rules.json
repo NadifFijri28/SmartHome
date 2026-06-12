@@ -1,0 +1,183 @@
+// File: firebase_backend/database.rules.json
+// =============================================================================
+// SmartHome Core - Firebase Realtime Database Security Rules (Fase 1 MVP)
+// =============================================================================
+// Disusun untuk menutup celah bypass tulis langsung ke RTDB. Mengacu pada:
+//   - docs/PRD.md bab 6.A "Server-Side Hardening"
+//   - .rules bab 3.C "No Wildcard Write Rules"
+//   - architecture_flow.md sec.2.A "User Not Approved / Unauthorized -> 403"
+//
+// PRINSIP UTAMA:
+//   1. Default deny  : node yang tidak diatur eksplisit akan tetap menolak
+//                      operasi (RTDB rules bersifat shallow-cascade,
+//                      jadi `.read/.write` di parent menutup child kecuali
+//                      di-override).
+//   2. Owner-only    : penulisan ke schedules, metadata, dan current_state
+//                      relay_1 memerlukan auth.uid == metadata.owner_uid.
+//                      Untuk Fase 1 ini cocok karena hanya ada satu user
+//                      Owner dan belum ada konsep multi-member writable.
+//   3. Approved-gate : pembacaan dan setiap tulisan terbatas pada user
+//                      berstatus "Approved" pada node /users/<uid>/status.
+//   4. Self-only on  : /users/<uid> hanya boleh dibaca/ditulis oleh user
+//      profile         itu sendiri (kecuali Owner yang mengelola anggota).
+//   5. Validasi tipe : setiap field dilindungi `.validate` agar payload
+//                      asing tidak dapat membanjiri schema.
+//
+// CATATAN PENERAPAN:
+//   - File ini deployable via `firebase deploy --only database` setelah
+//     project Firebase ditautkan ke folder ini.
+//   - Komentar `//` diperbolehkan oleh parser Firebase Realtime Rules JSON.
+// =============================================================================
+{
+  "rules": {
+    // -------------------------------------------------------------------------
+    // /devices/{deviceId}
+    // -------------------------------------------------------------------------
+    "devices": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'Approved'",
+      "$device_id": {
+
+        // ---- metadata: hanya Owner perangkat yang boleh menulis. ----------
+        // Status 'Offline' juga ditulis lewat onDisconnect ESP32 (auth via
+        // Database Secret); Database Secret melewati seluruh rules sehingga
+        // tetap berfungsi tanpa pengecualian khusus di sini.
+        "metadata": {
+          ".write": "auth != null && data.child('owner_uid').val() === auth.uid && root.child('users').child(auth.uid).child('status').val() === 'Approved'",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length < 80"
+          },
+          "status": {
+            ".validate": "newData.isString() && (newData.val() === 'Online' || newData.val() === 'Offline')"
+          },
+          "owner_uid": {
+            // owner_uid hanya boleh diset oleh dirinya sendiri atau saat
+            // pertama kali registrasi via Cloud Functions (server admin).
+            ".validate": "newData.isString() && (newData.val() === auth.uid || !data.exists())"
+          },
+          "hardware_version": {
+            ".validate": "newData.isString()"
+          },
+          "last_boot_report": {
+            ".validate": "newData.isString()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+
+        // ---- components/{componentId}: aturan utama relay & jadwal --------
+        "components": {
+          "$component_id": {
+
+            // current_state: writable ONLY oleh Owner perangkat berstatus
+            // Approved (acuan: instruksi user Fase 1 - "memvalidasi pemilik
+            // sah melalui owner_uid").
+            "current_state": {
+              ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'Approved'",
+              ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'Approved' && root.child('devices').child($device_id).child('metadata').child('owner_uid').val() === auth.uid",
+              ".validate": "newData.isBoolean()"
+            },
+
+            // current_value: ditulis oleh ESP32 (sensor) - di Fase 1 belum
+            // dipakai, tapi rules sudah disiapkan untuk Fase 2. Owner boleh
+            // baca; tulis dibuka untuk owner saja (Cloud Functions akan
+            // mengoverride dengan service account ketika histeresis aktif).
+            "current_value": {
+              ".write": "auth != null && root.child('devices').child($device_id).child('metadata').child('owner_uid').val() === auth.uid",
+              ".validate": "newData.isNumber()"
+            },
+
+            // type, ui_element, label, automation_type: konfigurasi statis
+            // yang hanya berubah lewat Owner.
+            "type": {
+              ".write": "auth != null && root.child('devices').child($device_id).child('metadata').child('owner_uid').val() === auth.uid",
+              ".validate": "newData.isString() && (newData.val() === 'OUTPUT' || newData.val() === 'INPUT')"
+            },
+            "ui_element": {
+              ".write": "auth != null && root.child('devices').child($device_id).child('metadata').child('owner_uid').val() === auth.uid",
+              ".validate": "newData.isString() && (newData.val() === 'SWITCH' || newData.val() === 'GAUGE_TEXT')"
+            },
+            "label": {
+              ".write": "auth != null && root.child('devices').child($device_id).child('metadata').child('owner_uid').val() === auth.uid",
+              ".validate": "newData.isString() && newData.val().length < 80"
+            },
+            "automation_type": {
+              ".write": "auth != null && root.child('devices').child($device_id).child('metadata').child('owner_uid').val() === auth.uid",
+              ".validate": "newData.isString() && (newData.val() === 'NONE' || newData.val() === 'TIME_BASED' || newData.val() === 'THRESHOLD_BASED')"
+            },
+
+            // schedules: array alarm waktu. Hanya Owner yang boleh
+            // menulis (acuan: docs/wireframe_component.md bab 5.B - tombol
+            // "+ Tambah Jadwal" hanya untuk Owner).
+            "schedules": {
+              ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'Approved' && root.child('devices').child($device_id).child('metadata').child('owner_uid').val() === auth.uid",
+              "$index": {
+                ".validate": "newData.hasChildren(['id','label','is_active','on_time','off_time'])",
+                "id":        { ".validate": "newData.isString()" },
+                "label":     { ".validate": "newData.isString() && newData.val().length < 80" },
+                "is_active": { ".validate": "newData.isBoolean()" },
+                "on_time":   { ".validate": "newData.isString() && newData.val().matches(/^([01]\\d|2[0-3]):[0-5]\\d$/)" },
+                "off_time":  { ".validate": "newData.isString() && newData.val().matches(/^([01]\\d|2[0-3]):[0-5]\\d$/)" },
+                "$other":    { ".validate": false }
+              }
+            },
+
+            // rules: aturan threshold untuk komponen INPUT (Fase 2).
+            // Disiapkan tapi belum aktif di Fase 1.
+            "rules": {
+              ".write": "auth != null && root.child('devices').child($device_id).child('metadata').child('owner_uid').val() === auth.uid"
+            }
+          }
+        }
+      }
+    },
+
+    // -------------------------------------------------------------------------
+    // /users/{uid}
+    // -------------------------------------------------------------------------
+    "users": {
+      // User hanya bisa baca dirinya sendiri. Owner perangkat tidak
+      // mendapat shortcut baca user lain di sini - manajemen anggota
+      // dilakukan via Cloud Functions admin SDK.
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "name":   { ".validate": "newData.isString() && newData.val().length < 80" },
+        "email":  { ".validate": "newData.isString() && newData.val().contains('@')" },
+        "role": {
+          // Initial value WAJIB 'Member' (mencegah self-promote ke Owner
+          // via signUp client). Setelah ditulis pertama kali, hanya admin
+          // SDK / Cloud Functions yang dapat mengubahnya (admin bypass
+          // rules), sehingga nilai harus tetap sama bila diset dari client.
+          ".validate": "(!data.exists() && newData.val() === 'Member') || newData.val() === data.val()"
+        },
+        "status": {
+          // Initial value WAJIB 'Pending'. Owner mengubahnya ke 'Approved'
+          // via Cloud Functions admin SDK (acuan: PRD bab 4.B Whitelisting
+          // & Approval System).
+          ".validate": "(!data.exists() && newData.val() === 'Pending') || newData.val() === data.val()"
+        },
+        "registered_at": { ".validate": "newData.isString()" },
+        "associated_devices": {
+          ".validate": "newData.hasChildren() || !newData.exists()"
+        },
+        "$other": { ".validate": false }
+      }
+    },
+
+    // -------------------------------------------------------------------------
+    // /system_configs/user_limit_caps/{deviceId}
+    // -------------------------------------------------------------------------
+    "system_configs": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'Approved'",
+      "user_limit_caps": {
+        "$device_id": {
+          ".write": "auth != null && root.child('devices').child($device_id).child('metadata').child('owner_uid').val() === auth.uid",
+          "max_slots":      { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 50" },
+          "currently_used": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "$other":         { ".validate": false }
+        }
+      }
+    }
+  }
+}

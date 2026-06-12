@@ -1,0 +1,62 @@
+{
+  "_meta": {
+    "__source_file__": "firebase_backend/seed.json",
+    "__purpose__": "Seed minimal Fase 1 MVP - import via Firebase Console (Realtime Database > tiga-titik > Import JSON). Setelah import berhasil, node _meta ini boleh dihapus secara manual. Komentar tidak disertakan di body karena Firebase Console memakai strict JSON parser.",
+    "__phase__": "1-MVP",
+    "__seeded_at__": "2026-05-25T13:00:00Z"
+  },
+  "devices": {
+    "ESP32_MAC_A1B2C3D4E5F6": {
+      "metadata": {
+        "name": "Hub Utama Ruang Tengah",
+        "status": "Online",
+        "owner_uid": "user_owner_nadif123",
+        "hardware_version": "v1.0.0",
+        "last_boot_report": "2026-05-25T13:00:00Z"
+      },
+      "components": {
+        "relay_1": {
+          "type": "OUTPUT",
+          "ui_element": "SWITCH",
+          "label": "Lampu Teras Utama",
+          "current_state": false,
+          "automation_type": "TIME_BASED",
+          "schedules": [
+            {
+              "id": "sched_01",
+              "label": "Pagi 04:00-06:00",
+              "is_active": true,
+              "on_time": "04:00",
+              "off_time": "06:00"
+            },
+            {
+              "id": "sched_02",
+              "label": "Malam 18:00-22:00",
+              "is_active": true,
+              "on_time": "18:00",
+              "off_time": "22:00"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "users": {
+    "user_owner_nadif123": {
+      "name": "Nadif Fijri Fajar Arifin",
+      "email": "nadiffijri64@gmail.com",
+      "role": "Owner",
+      "status": "Approved",
+      "registered_at": "2026-01-10T02:30:00Z",
+      "associated_devices": ["ESP32_MAC_A1B2C3D4E5F6"]
+    }
+  },
+  "system_configs": {
+    "user_limit_caps": {
+      "ESP32_MAC_A1B2C3D4E5F6": {
+        "max_slots": 5,
+        "currently_used": 1
+      }
+    }
+  }
+}

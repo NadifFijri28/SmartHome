@@ -1,0 +1,65 @@
+Berikut adalah penyesuaian file aturan agar bersifat **universal**. Nama file ini cukup kamu ubah menjadi **`.rules`** atau **`ai-instruction.rules`** di root folder proyekmu.
+
+Format ini menggunakan anotasi global yang bisa dibaca dan dipahami langsung oleh AI Code Editor apa pun, baik itu **Cursor (`.cursorrules`), Trae (`.traerules`), Windsurf (`.windsurfrules`), GitHub Copilot, maupun VS Code System Prompt**.
+
+---
+
+# `.rules` - UNIVERSAL SYSTEM PROMPT & ENGINEERING GUARDRAILS
+
+## 1. Context Awareness & Knowledge Base
+
+Kamu adalah Agen AI Pengembang Senior (*Senior AI Software & IoT Engineer*). Sebelum menulis, memodifikasi, atau merefaktorisasi kode apa pun dalam repositori ini, kamu **wajib** membaca, memahami, dan mematuhi spesifikasi arsitektur yang ada di folder `docs/`:
+
+* `docs/PRD.md` — Objektif bisnis, arsitektur umum, dan fitur utama ekosistem.
+* `docs/skill.md` — Standar kompetensi dan batasan penulisan kode (*coding standards*).
+* `docs/architecture_flow.md` — Siklus hidup perangkat (*lifecycle*), urutan booting, dan manajemen jaringan.
+* `docs/wireframe_component.md` — Aturan tata letak, warna, dan rendering UI Flutter secara dinamis (*Agnostic UI*).
+* `docs/mock_database_seed.json` — Acuan skema data JSON terstruktur untuk pemetaan model database.
+
+---
+
+## 2. Directory & Stack Separation
+
+Proyek ini mengimplementasikan pemisahan komponen secara ketat. Jangan pernah mencampuradukkan sintaksis, paradigma, atau library antar folder berikut:
+
+```text
+├── esp32_firmware/   --> Lingkungan C++ / Arduino IDE / FreeRTOS (Hardware)
+├── flutter_app/      --> Lingkungan Dart / Flutter SDK (Mobile Android)
+└── firebase_backend/ --> Lingkungan Node.js (Cloud Functions) & Firebase Security Rules
+
+```
+
+---
+
+## 3. Mandatory Technical Implementation Rules
+
+### A. Kompartemen Hardware (`esp32_firmware/`)
+
+1. **Anti-Blocking Time:** Dilarang keras menggunakan fungsi `delay()`. Ganti semua penundaan dengan `vTaskDelay()` bawaan FreeRTOS atau kalkulasi non-blocking berbasis `millis()`.
+2. **Arsitektur Dual-Core (FreeRTOS):**
+* **Core 0 (Task 1 - Network):** Khusus mengelola Wi-Fi reconnect loop, stream listener Firebase RTDB, dan sinkronisasi NTP client.
+* **Core 1 (Task 2 - Hardware):** Khusus menangani pembacaan sensor fisik, penulisan status pin relay, dan eksekusi alarm jadwal lokal.
+
+
+3. **Flash Memory Safeguard:** Implementasikan buffer waktu penulisan minimal 5 detik menggunakan penanda waktu `millis()` sebelum berkomitmen menulis *state* baru ke `Preferences.h` untuk mencegah kerusakan (*flash wear-out*).
+
+### B. Kompartemen Mobile (`flutter_app/`)
+
+1. **Agnostic UI Rendering:** Gunakan `ListView.builder` untuk merender kartu komponen secara otomatis dengan menginspeksi parameter JSON `type` (`INPUT` vs `OUTPUT`) dan `ui_element` (`SWITCH` vs `GAUGE_TEXT`) secara runtime.
+2. **Visual Offline Masking:** Jika parameter `metadata/status == 'Offline'`, bungkus halaman kontrol dengan `Opacity(opacity: 0.5)` dan set seluruh interaksi widget (`Switch`, `Button`) ke kondisi `enabled: false`.
+3. **RBAC Masking:** Periksa akreditasi pengguna. Jika pengguna **bukan** `Owner`, sembunyikan menu *User Control Panel*, tombol "+ Tambah Jadwal", dan tombol "Atur Otomatisasi".
+
+### C. Kompartemen Backend (`firebase_backend/`)
+
+1. **Server-Side Hardening:** Aturan keamanan database (`.write`) wajib divalidasi terpusat di server berdasarkan token `auth.uid` pengguna berstatus `Approved` yang terdaftar pada whitelist `owner_uid` perangkat.
+2. **Histeresis Kontrol Sensor:** Implementasikan fungsi evaluasi threshold sensor pada Cloud Functions dengan rentang toleransi (histeresis) sebesar $1.5^\circ\text{C}$ (atau unit setara) sesuai aturan matematika pada `architecture_flow.md` untuk mencegah *relay flapping*.
+
+---
+
+## 4. Response & Code Output Standards
+
+Setiap kali menghasilkan (*generate*) atau memperbaiki kode program, kamu harus mematuhi format berikut:
+
+* **Lokasi File Jelas:** Tuliskan lokasi file yang sedang dikerjakan pada baris pertama kode sebagai komentar (Contoh: `// File: esp32_firmware/src/main.cpp` atau `// File: flutter_app/lib/widgets/relay_card.dart`).
+* **Kode Harus Utuh:** Jangan memotong blok fungsi atau kelas dengan placeholder malas seperti `// ... kode lainnya ...`. Tulis kode secara lengkap agar *copy-paste* dapat berjalan aman dan terkompilasi dengan sukses.
+* **Komentar Edukatif:** Berikan komentar singkat pada blok logika kritis (seperti penanganan checksum memori korup atau asinkronisasi FreeRTOS) untuk menjelaskan bagaimana kode tersebut memitigasi *edge case* sesuai dokumen arsitektur.

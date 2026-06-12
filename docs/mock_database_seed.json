@@ -1,0 +1,128 @@
+{
+  "devices": {
+    "ESP32_MAC_A1B2C3D4E5F6": {
+      "metadata": {
+        "name": "Hub Utama Ruang Tengah",
+        "status": "Online",
+        "owner_uid": "user_owner_nadif123",
+        "hardware_version": "v1.0.0",
+        "last_boot_report": "2026-05-25T13:00:00Z"
+      },
+      "components": {
+        "relay_1": {
+          "type": "OUTPUT",
+          "ui_element": "SWITCH",
+          "label": "Lampu Teras Utama",
+          "current_state": false,
+          "automation_type": "TIME_BASED",
+          "schedules": [
+            {
+              "id": "sched_01",
+              "label": "Otomatisasi Malam Hari",
+              "is_active": true,
+              "on_time": "18:00",
+              "off_time": "05:30"
+            },
+            {
+              "id": "sched_02",
+              "label": "Penerangan Subuh",
+              "is_active": false,
+              "on_time": "04:00",
+              "off_time": "05:00"
+            }
+          ]
+        },
+        "relay_2": {
+          "type": "OUTPUT",
+          "ui_element": "SWITCH",
+          "label": "Lampu Gantung Ruang Tamu",
+          "current_state": true,
+          "automation_type": "NONE",
+          "schedules": []
+        }
+      }
+    },
+    "ESP32_MAC_789XYZ123456": {
+      "metadata": {
+        "name": "Klimatologi Kamar Server",
+        "status": "Offline",
+        "owner_uid": "user_owner_nadif123",
+        "hardware_version": "v1.2.0",
+        "last_boot_report": "2026-05-24T08:15:22Z"
+      },
+      "components": {
+        "sensor_suhu_1": {
+          "type": "INPUT",
+          "ui_element": "GAUGE_TEXT",
+          "label": "Sensor Suhu Ruang Rak",
+          "current_value": 31.8,
+          "automation_type": "THRESHOLD_BASED",
+          "rules": [
+            {
+              "id": "rule_01",
+              "is_active": true,
+              "condition": "GREATER_THAN",
+              "threshold_value": 31.0,
+              "target_component": "relay_exhaust",
+              "action": true
+            }
+          ]
+        },
+        "sensor_kelembapan_1": {
+          "type": "INPUT",
+          "ui_element": "GAUGE_TEXT",
+          "label": "Sensor Kelembapan Kamar",
+          "current_value": 65.2,
+          "automation_type": "NONE",
+          "rules": []
+        },
+        "relay_exhaust": {
+          "type": "OUTPUT",
+          "ui_element": "SWITCH",
+          "label": "Kipas Exhaust Panel",
+          "current_state": true,
+          "automation_type": "NONE",
+          "schedules": []
+        }
+      }
+    }
+  },
+  "users": {
+    "user_owner_nadif123": {
+      "name": "Nadif Fijri Fajar Arifin",
+      "email": "nadif@example.com",
+      "role": "Owner",
+      "status": "Approved",
+      "registered_at": "2026-01-10T02:30:00Z",
+      "associated_devices": ["ESP32_MAC_A1B2C3D4E5F6", "ESP32_MAC_789XYZ123456"]
+    },
+    "user_member_001": {
+      "name": "Ahmad Dani",
+      "email": "dani@example.com",
+      "role": "Member",
+      "status": "Approved",
+      "registered_at": "2026-03-15T09:45:00Z",
+      "associated_devices": ["ESP32_MAC_A1B2C3D4E5F6"]
+    },
+    "user_member_002": {
+      "name": "Rizky Pratama",
+      "email": "rizky@example.com",
+      "role": "Member",
+      "status": "Pending",
+      "registered_at": "2026-05-25T07:12:00Z",
+      "associated_devices": ["ESP32_MAC_A1B2C3D4E5F6"]
+    }
+  },
+  "system_configs": {
+    "user_limit_caps": {
+      "ESP32_MAC_A1B2C3D4E5F6": {
+        "max_slots": 5,
+        "currently_used": 2
+      },
+      "ESP32_MAC_789XYZ123456": {
+        "max_slots": 2,
+        "currently_used": 1
+      }
+    }
+  }
+}

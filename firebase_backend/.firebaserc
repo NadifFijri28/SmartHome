@@ -1,0 +1,10 @@
+{
+  "projects": {
+    "default": "smarthome-47214",
+    "SmartHome": "smarthome-47214"
+  },
+  "targets": {},
+  "etags": {},
+  "_comment_file_location": "firebase_backend/.firebaserc - pengikat ke Firebase project",
+  "_comment_instructions": "GANTI nilai 'default' di bawah ini dengan Project ID Firebase Anda (lihat URL Firebase Console, mis. 'smarthome-core-12345'). Lalu jalankan: cd firebase_backend && firebase use default && firebase deploy --only database"
+}

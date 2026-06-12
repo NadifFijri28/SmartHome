@@ -1,0 +1,7 @@
+{
+  "_comment_file_location": "firebase_backend/firebase.json - manifest Firebase CLI Fase 1 MVP",
+  "_comment_purpose": "Hanya database rules yang dideploy di Fase 1. Saat Cloud Functions histeresis ditulis di Fase 2, tambahkan blok 'functions' di sini.",
+  "database": {
+    "rules": "database.rules.json"
+  }
+}
