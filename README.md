@@ -33,6 +33,9 @@ SmartHome/
 │   │   ├── widgets/           # Komponen UI reusable
 │   │   └── theme/             # Tema Material 3
 │   └── pubspec.yaml
+├── web/                       # Light Web App (Vanilla + HTMX)
+│   ├── index.html             # Entry point web
+│   └── src/                   # Script JS & Assets
 └── firebase_backend/
     ├── firebase.json          # Manifest Firebase CLI
     ├── database.rules.json    # Security rules RTDB (default deny)
@@ -194,14 +197,70 @@ hardware akan terlihat real-time di UI lewat stream listener.
 
 ---
 
-## 5. Verifikasi End-to-End
+## 5. Web App (Vanilla + HTMX + Firebase)
+
+Selain aplikasi Flutter, sistem ini juga menyediakan *Light Web App* yang terletak di folder `web/`.
+
+### 5.1 Menjalankan secara Lokal
+
+1. Install static server sederhana atau gunakan Python.
+   - Node:
+     ```bash
+     npm install -g http-server
+     http-server web -p 5000
+     ```
+   - Python:
+     ```bash
+     python -m http.server 5000 --directory web
+     ```
+
+2. Buka situs di browser Anda:
+   ```bash
+   http://localhost:5000
+   ```
+
+### 5.2 Pengaturan Firebase Web
+1. Buka Firebase Console untuk proyek Anda.
+2. Di Authentication, aktifkan login **Email/Password**.
+3. Buat pengguna dengan email yang ingin Anda gunakan.
+4. Di Realtime Database, pastikan pengguna Anda disetujui di bawah `/users/<uid>/status` = `"Approved"`.
+
+### 5.3 Konfigurasi Penting
+- Aplikasi web menggunakan konfigurasi Firebase di `web/src/firebase-config.js`.
+- File ini diabaikan oleh Git. Anda harus membuatnya dengan menyalin `web/src/firebase-config.example.js` dan mengisi kredensial Anda.
+- Jika Anda mengubah proyek Firebase, perbarui objek config di `web/src/firebase-config.js`.
+- Aplikasi membaca dari node `/devices` di Realtime Database.
+
+### 5.4 Deployment Web
+1. Install Firebase CLI dan login:
+   ```bash
+   npm install -g firebase-tools
+   firebase login
+   ```
+2. Inisialisasi hosting di root repositori jika belum dilakukan:
+   ```bash
+   firebase init hosting
+   ```
+   - Atur direktori publik ke `web`
+   - Pilih `No` untuk penulisan ulang aplikasi satu halaman (single-page app) karena ini adalah aplikasi statis.
+3. Deploy:
+   ```bash
+   firebase deploy --only hosting
+   ```
+
+### 5.5 Catatan Web App
+- Aplikasi web ini sengaja dibuat ringan dan menggunakan Firebase client SDK secara langsung.
+- Halaman login diberi gaya untuk pengalaman web yang lebih profesional.
+
+---
+
+## 6. Verifikasi End-to-End
 
 Checklist berikut memastikan tiga lapisan saling bicara:
 
 - [ ] ESP32 Serial Monitor menunjukkan `[FB] Stream listener aktif`.
 - [ ] Node `/devices/<id>/metadata/status` di Firebase Console = `"Online"`.
-- [ ] Flutter Dashboard menampilkan device card dengan label
-      *"Lampu Teras Utama"*.
+- [ ] Flutter Dashboard / Web App menampilkan device card.
 - [ ] Menggeser Switch di app → log ESP32 muncul:
       `[FLASH] State relay_1 terkomit: ON/OFF` (setelah 5 detik debounce).
 - [ ] Cabut listrik ESP32 → Console RTDB melihat `metadata.status` flip
@@ -211,7 +270,7 @@ Checklist berikut memastikan tiga lapisan saling bicara:
 
 ---
 
-## 6. Troubleshooting Singkat
+## 7. Troubleshooting Singkat
 
 | Gejala | Akar Masalah | Solusi |
 | --- | --- | --- |
@@ -220,10 +279,12 @@ Checklist berikut memastikan tiga lapisan saling bicara:
 | ESP32 reboot loop dengan log `Preferences gagal di-mount` | Partisi NVS korup. | Tools → Erase Flash → "All Flash Contents", lalu re-upload. |
 | Flutter `MissingPluginException(firebase_core)` | Lupa menjalankan `flutterfire configure`. | Ulangi langkah 4.3 bagian FlutterFire CLI. |
 | Stream RTDB di Flutter tidak update | Security rules menolak baca. | Cek `/users/<uid>/status === "Approved"` (rules butuh ini untuk `.read`). |
+| (Web) `auth/invalid-login-credentials` | Email/password salah. | Pastikan kredensial yang dimasukkan benar di halaman login. |
+| (Web) `auth/network-request-failed` | Koneksi terputus ke Firebase. | Periksa jaringan internet/Wi-Fi. |
 
 ---
 
-## 7. Roadmap Singkat
+## 8. Roadmap Singkat
 
 Fase 1 (sekarang) → kontrol manual + schedule waktu untuk 1 relay.
 Fase 2 → Cloud Functions presence bridge, histeresis sensor input,
