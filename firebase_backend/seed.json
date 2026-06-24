@@ -10,7 +10,7 @@
       "metadata": {
         "name": "Hub Utama Ruang Tengah",
         "status": "Online",
-        "owner_uid": "user_owner_nadif123",
+        "owner_uid": "MREC8lQDaWc9jeuY2bezyftdljt1",
         "hardware_version": "v1.0.0",
         "last_boot_report": "2026-05-25T13:00:00Z"
       },
@@ -37,18 +37,36 @@
               "off_time": "22:00"
             }
           ]
+        },
+        "relay_2": {
+          "type": "OUTPUT",
+          "ui_element": "SWITCH",
+          "label": "Lampu Ruang Tamu",
+          "current_state": false,
+          "automation_type": "TIME_BASED",
+          "schedules": [
+            {
+              "id": "sched_03",
+              "label": "Sore 17:00-21:00",
+              "is_active": true,
+              "on_time": "17:00",
+              "off_time": "21:00"
+            }
+          ]
         }
       }
     }
   },
   "users": {
-    "user_owner_nadif123": {
+    "MREC8lQDaWc9jeuY2bezyftdljt1": {
       "name": "Nadif Fijri Fajar Arifin",
       "email": "nadiffijri64@gmail.com",
       "role": "Owner",
       "status": "Approved",
       "registered_at": "2026-01-10T02:30:00Z",
-      "associated_devices": ["ESP32_MAC_A1B2C3D4E5F6"]
+      "associated_devices": {
+        "ESP32_MAC_A1B2C3D4E5F6": true
+      }
     }
   },
   "system_configs": {

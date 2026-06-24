@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SmartHome (Light)</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <script src="https://unpkg.com/htmx.org@1.9.4"></script>
+</head>
+<body>
+  <div class="page-shell">
+    <section class="hero-panel">
+      <div class="brand-panel">
+        <div class="brand-logo">SH</div>
+        <div>
+          <h1>SmartHome</h1>
+          <p>Monitor and control your home devices with realtime Firebase sync.</p>
+        </div>
+      </div>
+
+      <div class="login-card" id="auth-card">
+        <div class="login-header">
+          <h2>Sign in to your dashboard</h2>
+          <p>Use your Firebase account email and password.</p>
+        </div>
+        <form id="login-form" class="login-form">
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="you@example.com" required autocomplete="email" />
+          <label for="password">Password</label>
+          <input id="password" type="password" placeholder="••••••••" required autocomplete="current-password" />
+          <button type="submit" class="primary-button">Sign in</button>
+        </form>
+        <div class="auth-note" id="auth-msg"></div>
+        <div class="info-note">Need an account? Create it in Firebase Console or contact your admin.</div>
+      </div>
+    </section>
+
+    <main id="app" class="app-shell" style="display:none">
+      <header class="app-header">
+        <div>
+          <h2>Device dashboard</h2>
+          <p>Realtime status from your Firebase Realtime Database.</p>
+        </div>
+        <button id="signout" class="secondary-button">Sign out</button>
+      </header>
+      <section id="devices" class="device-section">
+        <div class="section-title">
+          <h3>Devices</h3>
+          <span id="device-count">Loading...</span>
+        </div>
+        <div id="device-list" class="device-grid">Loading...</div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

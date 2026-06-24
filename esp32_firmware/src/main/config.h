@@ -52,20 +52,13 @@
 // =============================================================================
 // PIN HARDWARE FASE 1 (acuan: docs/PRD.md bab 3.A)
 // =============================================================================
-// Fase 1 hanya menggunakan 1 buah relay aktif pada GPIO 12.
+// Fase 1 mendukung 2 buah relay output.
 // Relay diasumsikan modul aktif HIGH; jika modul Anda aktif LOW,
 // balik logika di applyRelayState() pada main.ino.
 #define PIN_RELAY_1                  4
+#define PIN_RELAY_2                  16
 #define RELAY_ACTIVE_LEVEL           LOW
 #define RELAY_INACTIVE_LEVEL         HIGH
-
-// =============================================================================
-// NTP - Sinkronisasi waktu lokal Indonesia (UTC+7)
-// =============================================================================
-#define NTP_SERVER_PRIMARY           "id.pool.ntp.org"
-#define NTP_SERVER_SECONDARY         "pool.ntp.org"
-#define NTP_TIMEZONE_OFFSET_SEC      (7 * 3600)   // WIB
-#define NTP_DAYLIGHT_OFFSET_SEC      0
 
 // =============================================================================
 // KEY PREFERENCES (Non-Volatile Storage) - max 15 karakter per key
@@ -77,11 +70,24 @@
 // pada docs/PRD.md bab 6.D)
 #define PREF_KEY_RELAY1_STATE        "r1_state"   // bool: status terakhir
 #define PREF_KEY_RELAY1_CHECKSUM     "r1_chksum"  // uint32_t: CRC sederhana
+#define PREF_KEY_RELAY2_STATE        "r2_state"   // bool: status terakhir
+#define PREF_KEY_RELAY2_CHECKSUM     "r2_chksum"  // uint32_t: CRC sederhana
 
 // Key penyimpanan array schedules (di-serialize sebagai string JSON
 // untuk menjaga fidelitas dengan node RTDB)
-#define PREF_KEY_SCHEDULES_JSON      "sch_json"
-#define PREF_KEY_SCHEDULES_CHECKSUM  "sch_chksum"
+#define PREF_KEY_SCH1_JSON           "s1_json"
+#define PREF_KEY_SCH1_CHECKSUM       "s1_chksum"
+#define PREF_KEY_SCH2_JSON           "s2_json"
+#define PREF_KEY_SCH2_CHECKSUM       "s2_chksum"
+
+// =============================================================================
+// NTP - Sinkronisasi waktu lokal Indonesia (UTC+7)
+// =============================================================================
+#define NTP_SERVER_PRIMARY           "id.pool.ntp.org"
+#define NTP_SERVER_SECONDARY         "pool.ntp.org"
+#define NTP_TIMEZONE_OFFSET_SEC      (7 * 3600)   // WIB
+#define NTP_DAYLIGHT_OFFSET_SEC      0
+
 
 // =============================================================================
 // TIMING NON-BLOCKING (millis based - acuan: docs/skill.md bab 3 - ESP32)
@@ -117,12 +123,14 @@
 #define HARDWARE_TASK_CORE           1
 
 // =============================================================================
-// PATH NODE RTDB (Fase 1: satu device, satu relay)
+// PATH NODE RTDB (Fase 1: satu device, dua relay)
 // =============================================================================
 // Sintaks dinamis: composeRelayStatePath() pada main.ino akan menggabung
-// DEFAULT_DEVICE_ID + relay path saat runtime.
+// DEFAULT_DEVICE_ID + relay component path saat runtime.
 #define RTDB_PATH_DEVICES_ROOT       "/devices/"
-#define RTDB_PATH_RELAY_COMPONENT    "/components/relay_1"
+#define RTDB_PATH_COMPONENTS_ROOT    "/components"
+#define RTDB_PATH_RELAY_1_COMPONENT  "/components/relay_1"
+#define RTDB_PATH_RELAY_2_COMPONENT  "/components/relay_2"
 #define RTDB_PATH_RELAY_STATE_KEY    "current_state"
 #define RTDB_PATH_RELAY_SCHEDULES    "schedules"
 #define RTDB_PATH_METADATA_STATUS    "/metadata/status"

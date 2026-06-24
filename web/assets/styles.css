@@ -1,0 +1,500 @@
+:root {
+  color-scheme: dark;
+  color: #f1f5f9;
+  background: #091229;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.24), transparent 24%),
+              linear-gradient(135deg, #111827 0%, #0f172a 55%, #020617 100%);
+}
+
+.page-shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 40px 0;
+}
+
+.hero-panel {
+  display: grid;
+  gap: 32px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.brand-panel {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #e2e8f0;
+}
+
+.brand-logo {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #38bdf8, #818cf8);
+  font-weight: 700;
+  color: white;
+  font-size: 1.4rem;
+}
+
+.brand-panel h1 {
+  margin: 0;
+  font-size: clamp(2rem, 2.4vw, 3rem);
+}
+
+.brand-panel p {
+  margin: 8px 0 0;
+  color: #cbd5e1;
+  max-width: 560px;
+}
+
+.login-card,
+.app-shell {
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 28px;
+  padding: 32px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(16px);
+}
+
+.login-card {
+  max-width: 480px;
+}
+
+.login-header h2 {
+  margin: 0 0 8px;
+  font-size: 1.8rem;
+}
+
+.login-header p {
+  margin: 0;
+  color: #94a3b8;
+}
+
+.login-form {
+  margin-top: 28px;
+  display: grid;
+  gap: 18px;
+}
+
+.login-form label {
+  font-size: 0.9rem;
+  color: #cbd5e1;
+}
+
+.login-form input {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #f8fafc;
+  font-size: 1rem;
+}
+
+.login-form input:focus {
+  outline: none;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
+}
+
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 14px;
+  padding: 14px 18px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  color: white;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primary-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px rgba(56, 189, 248, 0.22);
+}
+
+.secondary-button {
+  background: rgba(255,255,255,0.1);
+  color: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.auth-note,
+.info-note {
+  margin-top: 18px;
+  color: #f8fafc;
+  font-size: 0.95rem;
+}
+
+.auth-note {
+  min-height: 1.4rem;
+  color: #fda4af;
+}
+
+.info-note {
+  color: #94a3b8;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.app-header h2 {
+  margin: 0;
+}
+
+.device-section {
+  display: grid;
+  gap: 18px;
+}
+
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: #cbd5e1;
+}
+
+.section-title h3 {
+  margin: 0;
+}
+
+.device-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+
+.device {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 22px;
+  padding: 22px;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.device:hover {
+  transform: translateY(-1px);
+  border-color: rgba(56, 189, 248, 0.24);
+}
+
+.device h3 {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+}
+
+.device p {
+  margin: 6px 0;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.badge.online { background: rgba(34,197,94,0.14); color: #a7f3d0; }
+.badge.offline { background: rgba(248,113,113,0.14); color: #fecaca; }
+
+.device-card {
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 24px;
+  padding: 22px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
+  margin-bottom: 18px;
+}
+
+.device-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.device-meta {
+  margin: 8px 0 0;
+  color: #94a3b8;
+}
+
+.device-component-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 18px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.device-component-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.component-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.component-subtitle {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.component-status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.badge-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.badge-state.on {
+  background: rgba(255, 215, 0, 0.16);
+  color: #FFD700;
+}
+
+.badge-state.off {
+  background: rgba(158, 158, 158, 0.16);
+  color: #9E9E9E;
+}
+
+.badge-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 54px;
+  height: 28px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  transition: 0.3s;
+}
+
+.slider:before {
+  position: absolute;
+  content: '';
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+.switch input:checked + .slider {
+  background-color: rgba(255, 215, 0, 0.32);
+}
+
+.switch input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+.schedule-section {
+  margin-top: 16px;
+}
+
+.schedule-header {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.schedule-list {
+  display: grid;
+  gap: 10px;
+}
+
+.schedule-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.schedule-item.active {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.22);
+}
+
+.schedule-item.inactive {
+  background: rgba(158, 158, 158, 0.10);
+  border-color: rgba(158, 158, 158, 0.18);
+}
+
+.schedule-item-left {
+  display: grid;
+  gap: 4px;
+}
+
+.schedule-label,
+.schedule-time {
+  color: #f8fafc;
+}
+
+.schedule-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.schedule-status {
+  font-size: 0.82rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.schedule-status.active {
+  background: rgba(34, 197, 94, 0.14);
+  color: #bef264;
+}
+
+.schedule-status.inactive {
+  background: rgba(148, 163, 184, 0.14);
+  color: #cbd5e1;
+}
+
+.schedule-delete {
+  background: rgba(248, 113, 113, 0.16);
+  color: #fecaca;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.schedule-delete:hover {
+  background: rgba(248, 113, 113, 0.26);
+}
+
+.schedule-add-container {
+  margin-top: 14px;
+}
+
+.schedule-form {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.schedule-form.hidden {
+  display: none;
+}
+
+.schedule-form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-form-grid input {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #f8fafc;
+}
+
+.schedule-form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.schedule-form-actions .primary-button.small,
+.schedule-form-actions .secondary-button.small {
+  padding: 10px 14px;
+  font-size: 0.92rem;
+}
+
+.schedule-empty {
+  color: #9ca3af;
+  font-size: 0.95rem;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.device-empty {
+  color: #cbd5e1;
+  font-size: 0.95rem;
+  padding: 14px;
+}
+
+@media (min-width: 900px) {
+  .hero-panel {
+    grid-template-columns: 1.1fr 0.9fr;
+    align-items: center;
+  }
+}

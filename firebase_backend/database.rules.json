@@ -34,8 +34,14 @@
     // /devices/{deviceId}
     // -------------------------------------------------------------------------
     "devices": {
-      ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'Approved'",
+      ".read": false,
       "$device_id": {
+        // Per-device read: allowed only when the device ID is listed in
+        // the authenticated user's `associated_devices` and the user
+        // is 'Approved'. Note: prefer storing `associated_devices` as
+        // an object map `{ "DEVICE_ID": true }` so this check works
+        // using `.child($device_id).exists()`.
+        ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'Approved' && root.child('users').child(auth.uid).child('associated_devices').child($device_id).exists()",
 
         // ---- metadata: hanya Owner perangkat yang boleh menulis. ----------
         // Status 'Offline' juga ditulis lewat onDisconnect ESP32 (auth via

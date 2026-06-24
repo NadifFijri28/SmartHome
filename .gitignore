@@ -10,3 +10,6 @@ firebase_backend/.firebaserc.local
 **/*.local.json
 **/*.local.yaml
 **/*.local.properties
+
+# Web Frontend secrets
+web/src/firebase-config.js

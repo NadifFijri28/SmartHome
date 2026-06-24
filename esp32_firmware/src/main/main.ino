@@ -45,17 +45,17 @@ static FirebaseConfig fbConfig;
 
 // --- State volatile (RAM) ------------------------------------------------
 // State yang sedang berlaku pada hardware. Sumber kebenaran selama runtime.
-static volatile bool    g_relayCurrentState        = false;
+static volatile bool    g_relayCurrentState[2]      = {false, false};
 // Target dari RTDB yang menunggu di-commit ke flash setelah debounce.
-static volatile bool    g_relayPendingFlashState   = false;
+static volatile bool    g_relayPendingFlashState[2] = {false, false};
 // Timestamp millis() saat perubahan target terakhir terjadi; 0 = tidak ada
 // pending. Digunakan oleh HardwareTask untuk hitung mundur 5 detik.
-static volatile uint32_t g_relayPendingSinceMs     = 0;
+static volatile uint32_t g_relayPendingSinceMs[2]   = {0, 0};
 
 // Penanda bahwa status relay lokal perlu dikirim ke RTDB oleh NetworkTask.
-static volatile bool    g_relayPendingRtdbChange  = false;
-static volatile bool    g_relayPendingRtdbState   = false;
-static portMUX_TYPE     g_relayPendingMux         = portMUX_INITIALIZER_UNLOCKED;
+static volatile bool    g_relayPendingRtdbChange[2] = {false, false};
+static volatile bool    g_relayPendingRtdbState[2]  = {false, false};
+static portMUX_TYPE     g_relayPendingMux           = portMUX_INITIALIZER_UNLOCKED;
 
 // Status sinkronisasi NTP. Jika false, eksekusi schedule ditangguhkan
 // (acuan: architecture_flow.md sec.4 - "Tangguhkan Otomatisasi").
@@ -82,8 +82,8 @@ struct LocalSchedule {
   uint8_t  offMinute;
 };
 
-static LocalSchedule   g_schedules[MAX_LOCAL_SCHEDULES];
-static uint8_t         g_scheduleCount             = 0;
+static LocalSchedule   g_schedules[2][MAX_LOCAL_SCHEDULES];
+static uint8_t         g_scheduleCount[2]             = {0, 0};
 
 // Penanda menit terakhir yang sudah dievaluasi -> mencegah eksekusi ganda
 // pada menit yang sama (HH:mm berlangsung 60 detik, evaluator jalan 1 Hz).
@@ -97,29 +97,30 @@ static Preferences     g_prefs;
 // =============================================================================
 static void   buildDeviceIdFromMac();
 static uint32_t computeChecksum(const uint8_t* data, size_t len);
-static bool   loadRelayStateFromFlash(bool& outState);
-static void   commitRelayStateToFlash(bool state);
-static void   applyRelayState(bool state);
-static void   markRelayChangePending(bool newState);
+static bool   loadRelayStateFromFlash(uint8_t relayIndex, bool& outState);
+static void   commitRelayStateToFlash(uint8_t relayIndex, bool state);
+static void   applyRelayState(uint8_t relayIndex, bool state);
+static void   markRelayChangePending(uint8_t relayIndex, bool newState);
 static void   processFlashDebounce(uint32_t nowMs);
 
 static bool   connectWiFiOnce();
 static void   ensureWiFiConnected(uint32_t nowMs);
 static void   initFirebase();
-static String composeRelayStatePath();
-static String composeSchedulesPath();
+static String composeRelayStatePath(uint8_t relayIndex);
+static String composeSchedulesPath(uint8_t relayIndex);
 static String composeMetadataStatusPath();
 static String composeMetadataLastBootPath();
+static String composeComponentsPath();
 
 static void   startRtdbStream();
 static void   handleRtdbStreamData();
 static void   onRtdbStreamTimeout(bool timeout);
 
-static void   syncSchedulesFromJson(const String& jsonPayload);
+static void   syncSchedulesFromJson(uint8_t relayIndex, const String& jsonPayload);
 static void   loadSchedulesFromFlash();
-static void   persistSchedulesToFlash(const String& jsonPayload);
-static void   enqueueRelayStateWrite(bool state);
-static bool   consumePendingRelayWrite(bool& outState);
+static void   persistSchedulesToFlash(uint8_t relayIndex, const String& jsonPayload);
+static void   enqueueRelayStateWrite(uint8_t relayIndex, bool state);
+static bool   consumePendingRelayWrite(uint8_t relayIndex, bool& outState);
 static void   processPendingRelayWrite();
 static void   evaluateSchedulesNow(const struct tm& nowLocal);
 
@@ -138,26 +139,33 @@ void setup() {
   // --- TAHAP 1: Fail-Safe Recovery (< 100ms) -----------------------------
   // Pin di-init lebih dulu agar tidak floating (mencegah relay click acak).
   pinMode(PIN_RELAY_1, OUTPUT);
+  pinMode(PIN_RELAY_2, OUTPUT);
   digitalWrite(PIN_RELAY_1, RELAY_INACTIVE_LEVEL);
+  digitalWrite(PIN_RELAY_2, RELAY_INACTIVE_LEVEL);
 
   if (!g_prefs.begin(PREF_NAMESPACE, /*readOnly=*/false)) {
     // Namespace gagal dibuka -> NVS rusak. Fallback Factory Default OFF,
     // sesuai tabel edge case docs/PRD.md bab 6.D.
     Serial.println(F("[BOOT] Preferences gagal di-mount. Factory Default OFF."));
-    g_relayCurrentState = false;
-    applyRelayState(false);
+    g_relayCurrentState[0] = false;
+    g_relayCurrentState[1] = false;
+    applyRelayState(0, false);
+    applyRelayState(1, false);
   } else {
-    bool persistedState = false;
-    if (loadRelayStateFromFlash(persistedState)) {
-      g_relayCurrentState = persistedState;
-      applyRelayState(persistedState);
-      Serial.printf("[BOOT] State terakhir dipulihkan: %s\n",
-                    persistedState ? "ON" : "OFF");
-    } else {
-      // Checksum gagal -> mode aman.
-      Serial.println(F("[BOOT] Checksum korup. Factory Default OFF."));
-      g_relayCurrentState = false;
-      applyRelayState(false);
+    for (uint8_t relayIndex = 0; relayIndex < 2; ++relayIndex) {
+      bool persistedState = false;
+      if (loadRelayStateFromFlash(relayIndex, persistedState)) {
+        g_relayCurrentState[relayIndex] = persistedState;
+        applyRelayState(relayIndex, persistedState);
+        Serial.printf("[BOOT] State relay_%u dipulihkan: %s\n",
+                      relayIndex + 1,
+                      persistedState ? "ON" : "OFF");
+      } else {
+        Serial.printf("[BOOT] State relay_%u default OFF\n",
+                      relayIndex + 1);
+        g_relayCurrentState[relayIndex] = false;
+        applyRelayState(relayIndex, false);
+      }
     }
   }
 
@@ -234,10 +242,18 @@ static uint32_t computeChecksum(const uint8_t* data, size_t len) {
   return hash;
 }
 
-static bool loadRelayStateFromFlash(bool& outState) {
+static const char* relayStateKey(uint8_t relayIndex) {
+  return relayIndex == 0 ? PREF_KEY_RELAY1_STATE : PREF_KEY_RELAY2_STATE;
+}
+
+static const char* relayChecksumKey(uint8_t relayIndex) {
+  return relayIndex == 0 ? PREF_KEY_RELAY1_CHECKSUM : PREF_KEY_RELAY2_CHECKSUM;
+}
+
+static bool loadRelayStateFromFlash(uint8_t relayIndex, bool& outState) {
   // Default value sengaja diberi 0xFF agar bisa dibedakan dari "tertulis 0".
-  uint8_t  raw   = g_prefs.getUChar(PREF_KEY_RELAY1_STATE, 0xFF);
-  uint32_t store = g_prefs.getUInt(PREF_KEY_RELAY1_CHECKSUM, 0);
+  uint8_t  raw   = g_prefs.getUChar(relayStateKey(relayIndex), 0xFF);
+  uint32_t store = g_prefs.getUInt(relayChecksumKey(relayIndex), 0);
 
   if (raw == 0xFF) {
     // Belum pernah ditulis (perangkat baru). Bukan "korup", tapi tidak
@@ -253,46 +269,52 @@ static bool loadRelayStateFromFlash(bool& outState) {
   return true;
 }
 
-static void commitRelayStateToFlash(bool state) {
+static void commitRelayStateToFlash(uint8_t relayIndex, bool state) {
   uint8_t raw = state ? 1 : 0;
-  g_prefs.putUChar(PREF_KEY_RELAY1_STATE, raw);
-  g_prefs.putUInt(PREF_KEY_RELAY1_CHECKSUM, computeChecksum(&raw, sizeof(raw)));
-  Serial.printf("[FLASH] State relay_1 terkomit: %s\n", state ? "ON" : "OFF");
+  g_prefs.putUChar(relayStateKey(relayIndex), raw);
+  g_prefs.putUInt(relayChecksumKey(relayIndex), computeChecksum(&raw, sizeof(raw)));
+  Serial.printf("[FLASH] State relay_%u terkomit: %s\n",
+                relayIndex + 1,
+                state ? "ON" : "OFF");
 }
 
 // =============================================================================
 // HARDWARE GPIO + DEBOUNCE FLASH WRITE
 // =============================================================================
-static void applyRelayState(bool state) {
-  digitalWrite(PIN_RELAY_1,
+static void applyRelayState(uint8_t relayIndex, bool state) {
+  const uint8_t pin = (relayIndex == 0) ? PIN_RELAY_1 : PIN_RELAY_2;
+  digitalWrite(pin,
                state ? RELAY_ACTIVE_LEVEL : RELAY_INACTIVE_LEVEL);
-  g_relayCurrentState = state;
+  g_relayCurrentState[relayIndex] = state;
 }
 
-static void markRelayChangePending(bool newState) {
+static void markRelayChangePending(uint8_t relayIndex, bool newState) {
   // Dipanggil oleh NetworkTask saat menerima push dari RTDB ATAU oleh
   // HardwareTask saat schedule lokal memicu perubahan. Setiap perubahan
   // me-reset timer debounce sehingga osilasi cepat (<5 detik) hanya
   // menyentuh RAM, tidak flash.
-  if (newState == g_relayCurrentState && g_relayPendingSinceMs == 0) {
+  if (newState == g_relayCurrentState[relayIndex] &&
+      g_relayPendingSinceMs[relayIndex] == 0) {
     return; // tidak ada perubahan, abaikan
   }
-  applyRelayState(newState);
-  g_relayPendingFlashState = newState;
-  g_relayPendingSinceMs    = millis();
-  if (g_relayPendingSinceMs == 0) {
+  applyRelayState(relayIndex, newState);
+  g_relayPendingFlashState[relayIndex] = newState;
+  g_relayPendingSinceMs[relayIndex]   = millis();
+  if (g_relayPendingSinceMs[relayIndex] == 0) {
     // Edge case: millis() rollover ke 0 setelah ~49 hari. Geser 1ms ke
     // depan agar sentinel "0 = tidak ada pending" tetap valid.
-    g_relayPendingSinceMs = 1;
+    g_relayPendingSinceMs[relayIndex] = 1;
   }
 }
 
 static void processFlashDebounce(uint32_t nowMs) {
-  if (g_relayPendingSinceMs == 0) return;
-  // Aman terhadap rollover: selisih unsigned tetap benar.
-  if ((nowMs - g_relayPendingSinceMs) >= FLASH_WRITE_DEBOUNCE_MS) {
-    commitRelayStateToFlash(g_relayPendingFlashState);
-    g_relayPendingSinceMs = 0;
+  for (uint8_t relayIndex = 0; relayIndex < 2; ++relayIndex) {
+    if (g_relayPendingSinceMs[relayIndex] == 0) continue;
+    // Aman terhadap rollover: selisih unsigned tetap benar.
+    if ((nowMs - g_relayPendingSinceMs[relayIndex]) >= FLASH_WRITE_DEBOUNCE_MS) {
+      commitRelayStateToFlash(relayIndex, g_relayPendingFlashState[relayIndex]);
+      g_relayPendingSinceMs[relayIndex] = 0;
+    }
   }
 }
 
@@ -344,19 +366,28 @@ static void initFirebase() {
   Serial.println(F("[FB] Firebase client initialized."));
 }
 
-static String composeRelayStatePath() {
-  // /devices/<id>/components/relay_1
+static String composeComponentsPath() {
   String p = RTDB_PATH_DEVICES_ROOT;
   p += g_deviceId;
-  p += RTDB_PATH_RELAY_COMPONENT;
+  p += RTDB_PATH_COMPONENTS_ROOT;
   return p;
 }
-static String composeSchedulesPath() {
-  String p = composeRelayStatePath();
+
+static String composeRelayStatePath(uint8_t relayIndex) {
+  String p = RTDB_PATH_DEVICES_ROOT;
+  p += g_deviceId;
+  p += (relayIndex == 0) ? RTDB_PATH_RELAY_1_COMPONENT
+                          : RTDB_PATH_RELAY_2_COMPONENT;
+  return p;
+}
+
+static String composeSchedulesPath(uint8_t relayIndex) {
+  String p = composeRelayStatePath(relayIndex);
   p += "/";
   p += RTDB_PATH_RELAY_SCHEDULES;
   return p;
 }
+
 static String composeMetadataStatusPath() {
   String p = RTDB_PATH_DEVICES_ROOT;
   p += g_deviceId;
@@ -371,7 +402,7 @@ static String composeMetadataLastBootPath() {
 }
 
 static void startRtdbStream() {
-  String path = composeRelayStatePath();
+  String path = composeComponentsPath();
   if (!Firebase.RTDB.beginStream(&fbStream, path.c_str())) {
     Serial.printf("[FB] beginStream gagal: %s\n", fbStream.errorReason().c_str());
     return;
@@ -406,6 +437,27 @@ static void startRtdbStream() {
                           "Offline");
 }
 
+// Helper: convert FirebaseJsonData to boolean (handle bool + string types)
+static bool jsonDataToBool(const FirebaseJsonData& fjd) {
+  // 1. Jika terdeteksi sebagai boolean murni dari Firebase Console
+  if (fjd.typeNum == FirebaseJson::JSON_BOOL) {
+    return fjd.boolValue;
+  }
+  
+  // 2. Jika terdeteksi sebagai string dari fungsi update() web JavaScript
+  if (fjd.typeNum == FirebaseJson::JSON_STRING) {
+    // KUNCI: Gunakan fjd.stringValue karena fjd.stringData kadang kosong pada jenis payload terkompresi
+    String str = fjd.stringValue; 
+    str.replace("\"", "");
+    str.toLowerCase();
+    str.trim(); // Bersihkan sisa spasi atau karakter newline gaib
+    
+    return (str == "true" || str == "1");
+  }
+  
+  return false;
+}
+
 static void handleRtdbStreamData() {
   if (!Firebase.RTDB.readStream(&fbStream)) {
     Serial.printf("[FB] readStream error: %s\n",
@@ -429,31 +481,79 @@ static void handleRtdbStreamData() {
                            *fbStream.jsonObjectPtr() : *(FirebaseJson*)nullptr;
       if (&json != nullptr) {
         FirebaseJsonData fjd;
-        if (json.get(fjd, RTDB_PATH_RELAY_STATE_KEY) && fjd.typeNum == FirebaseJson::JSON_BOOL) {
-          markRelayChangePending(fjd.boolValue);
+        if (json.get(fjd, "relay_1/current_state") && 
+            (fjd.typeNum == FirebaseJson::JSON_BOOL || fjd.typeNum == FirebaseJson::JSON_STRING)) {
+          markRelayChangePending(0, jsonDataToBool(fjd));
         }
-        if (json.get(fjd, RTDB_PATH_RELAY_SCHEDULES) &&
+        if (json.get(fjd, "relay_2/current_state") && 
+            (fjd.typeNum == FirebaseJson::JSON_BOOL || fjd.typeNum == FirebaseJson::JSON_STRING)) {
+          markRelayChangePending(1, jsonDataToBool(fjd));
+        }
+        if (json.get(fjd, "relay_1/schedules") &&
             (fjd.typeNum == FirebaseJson::JSON_ARRAY ||
              fjd.typeNum == FirebaseJson::JSON_OBJECT)) {
-          syncSchedulesFromJson(fjd.stringValue);
+          syncSchedulesFromJson(0, fjd.stringValue);
+        }
+        if (json.get(fjd, "relay_2/schedules") &&
+            (fjd.typeNum == FirebaseJson::JSON_ARRAY ||
+             fjd.typeNum == FirebaseJson::JSON_OBJECT)) {
+          syncSchedulesFromJson(1, fjd.stringValue);
         }
       }
     }
     return;
   }
 
-  // Kasus 2: hanya current_state yang berubah dari aplikasi mobile.
-  if (dataPath == "/current_state" && dataType == "boolean") {
-    markRelayChangePending(fbStream.boolData());
+  // Kasus 1.5: update() dari web ke node komponen (misal: /relay_1)
+  // Payload berupa JSON object: {"current_state": true}
+  if ((dataPath == "/relay_1" || dataPath == "/relay_2") && dataType == "json") {
+    FirebaseJson& json = fbStream.jsonObjectPtr() ?
+                         *fbStream.jsonObjectPtr() : *(FirebaseJson*)nullptr;
+    if (&json != nullptr) {
+      FirebaseJsonData fjd;
+      uint8_t relayIndex = (dataPath == "/relay_1") ? 0 : 1;
+      
+      if (json.get(fjd, "current_state") && 
+          (fjd.typeNum == FirebaseJson::JSON_BOOL || fjd.typeNum == FirebaseJson::JSON_STRING)) {
+        markRelayChangePending(relayIndex, jsonDataToBool(fjd));
+      }
+      
+      // Jika ternyata web juga melakukan update ke schedules bersamaan dengan current_state
+      if (json.get(fjd, "schedules") &&
+          (fjd.typeNum == FirebaseJson::JSON_ARRAY ||
+           fjd.typeNum == FirebaseJson::JSON_OBJECT)) {
+        syncSchedulesFromJson(relayIndex, fjd.stringValue);
+      }
+    }
     return;
   }
 
+// Kasus 2: hanya current_state yang berubah secara spesifik
+  if ((dataPath == "/relay_1/current_state" || dataPath == "/relay_2/current_state") &&
+      (dataType == "boolean" || dataType == "string")) {
+    
+    uint8_t relayIndex = (dataPath == "/relay_1/current_state") ? 0 : 1;
+    bool newState = false;
+
+    if (dataType == "boolean") {
+      newState = fbStream.boolData();
+    } else {
+      String strData = fbStream.stringData();
+      strData.replace("\"", "");
+      strData.toLowerCase();
+      strData.trim();
+      newState = (strData == "true" || strData == "1");
+    }
+
+    markRelayChangePending(relayIndex, newState);
+    return;
+  }
+  
   // Kasus 3: array schedules dimodifikasi (tambah/edit/hapus dari mobile).
-  if (dataPath.startsWith("/schedules")) {
-    // Ambil ulang seluruh node schedules agar konsisten (lebih aman
-    // ketimbang merge parsial yang sering bug pada array Firebase).
-    if (Firebase.RTDB.getJSON(&fbWrite, composeSchedulesPath().c_str())) {
-      syncSchedulesFromJson(fbWrite.payload());
+  if (dataPath.startsWith("/relay_1/schedules") || dataPath.startsWith("/relay_2/schedules")) {
+    uint8_t relayIndex = dataPath.startsWith("/relay_1/") ? 0 : 1;
+    if (Firebase.RTDB.getJSON(&fbWrite, composeSchedulesPath(relayIndex).c_str())) {
+      syncSchedulesFromJson(relayIndex, fbWrite.payload());
     }
     return;
   }
@@ -468,7 +568,7 @@ static void onRtdbStreamTimeout(bool timeout) {
 // =============================================================================
 // SYNC SCHEDULES: RTDB -> Preferences -> Array RAM
 // =============================================================================
-static void syncSchedulesFromJson(const String& jsonPayload) {
+static void syncSchedulesFromJson(uint8_t relayIndex, const String& jsonPayload) {
   // Gunakan DynamicJsonDocument dengan ukuran yang dibatasi agar tidak
   // meledakkan heap saat payload tidak terduga (acuan: skill.md
   // "String Allocation Guard").
@@ -478,7 +578,7 @@ static void syncSchedulesFromJson(const String& jsonPayload) {
   DynamicJsonDocument doc(kCapacity);
   DeserializationError err = deserializeJson(doc, jsonPayload);
   if (err) {
-    Serial.printf("[SYNC] JSON schedules invalid: %s\n", err.c_str());
+    Serial.printf("[SYNC] JSON schedules relay_%u invalid: %s\n", relayIndex + 1, err.c_str());
     return;
   }
 
@@ -492,7 +592,7 @@ static void syncSchedulesFromJson(const String& jsonPayload) {
     return;
   }
 
-  g_scheduleCount = 0;
+  g_scheduleCount[relayIndex] = 0;
   JsonArray arr;
   if (doc.is<JsonArray>()) {
     arr = doc.as<JsonArray>();
@@ -505,8 +605,8 @@ static void syncSchedulesFromJson(const String& jsonPayload) {
   }
 
   for (JsonObject s : arr) {
-    if (g_scheduleCount >= MAX_LOCAL_SCHEDULES) break;
-    LocalSchedule& slot = g_schedules[g_scheduleCount];
+    if (g_scheduleCount[relayIndex] >= MAX_LOCAL_SCHEDULES) break;
+    LocalSchedule& slot = g_schedules[relayIndex][g_scheduleCount[relayIndex]];
     const char* sid = s["id"] | "";
     strncpy(slot.id, sid, sizeof(slot.id) - 1);
     slot.id[sizeof(slot.id) - 1] = '\0';
@@ -521,54 +621,62 @@ static void syncSchedulesFromJson(const String& jsonPayload) {
     slot.onMinute = constrain(om, 0, 59);
     slot.offHour  = constrain(fh, 0, 23);
     slot.offMinute= constrain(fm, 0, 59);
-    g_scheduleCount++;
+    g_scheduleCount[relayIndex]++;
   }
 
   xSemaphoreGive(g_schedulesMutex);
 
-  persistSchedulesToFlash(jsonPayload);
-  Serial.printf("[SYNC] %u jadwal disinkronkan dari RTDB.\n", g_scheduleCount);
+  persistSchedulesToFlash(relayIndex, jsonPayload);
+  Serial.printf("[SYNC] %u jadwal disinkronkan dari RTDB untuk relay_%u.\n", g_scheduleCount[relayIndex], relayIndex + 1);
+}
+
+static const char* schedulesJsonKey(uint8_t relayIndex) {
+  return relayIndex == 0 ? PREF_KEY_SCH1_JSON : PREF_KEY_SCH2_JSON;
+}
+
+static const char* schedulesChecksumKey(uint8_t relayIndex) {
+  return relayIndex == 0 ? PREF_KEY_SCH1_CHECKSUM : PREF_KEY_SCH2_CHECKSUM;
 }
 
 static void loadSchedulesFromFlash() {
-  String cached = g_prefs.getString(PREF_KEY_SCHEDULES_JSON, "");
-  if (cached.length() == 0) {
-    Serial.println(F("[FLASH] Cache schedules kosong."));
-    return;
+  for (uint8_t relayIndex = 0; relayIndex < 2; ++relayIndex) {
+    String cached = g_prefs.getString(schedulesJsonKey(relayIndex), "");
+    if (cached.length() == 0) {
+      Serial.printf("[FLASH] Cache schedules relay_%u kosong.\n", relayIndex + 1);
+      continue;
+    }
+    uint32_t storedChksum = g_prefs.getUInt(schedulesChecksumKey(relayIndex), 0);
+    uint32_t actualChksum = computeChecksum(
+        reinterpret_cast<const uint8_t*>(cached.c_str()), cached.length());
+    if (storedChksum != actualChksum) {
+      Serial.printf("[FLASH] Checksum schedules relay_%u korup. Diabaikan.\n", relayIndex + 1);
+      continue;
+    }
+    syncSchedulesFromJson(relayIndex, cached);
   }
-  uint32_t storedChksum = g_prefs.getUInt(PREF_KEY_SCHEDULES_CHECKSUM, 0);
-  uint32_t actualChksum = computeChecksum(
-      reinterpret_cast<const uint8_t*>(cached.c_str()), cached.length());
-  if (storedChksum != actualChksum) {
-    Serial.println(F("[FLASH] Checksum schedules korup. Diabaikan."));
-    // Tidak otomatis di-clear; tunggu sync RTDB berikutnya menimpa
-    // (acuan: architecture_flow.md - "Jangan pernah Preferences.clear()").
-    return;
-  }
-  syncSchedulesFromJson(cached);
 }
 
-static void persistSchedulesToFlash(const String& jsonPayload) {
-  g_prefs.putString(PREF_KEY_SCHEDULES_JSON, jsonPayload);
+static void persistSchedulesToFlash(uint8_t relayIndex, const String& jsonPayload) {
+  g_prefs.putString(schedulesJsonKey(relayIndex), jsonPayload);
   uint32_t cs = computeChecksum(
       reinterpret_cast<const uint8_t*>(jsonPayload.c_str()),
       jsonPayload.length());
-  g_prefs.putUInt(PREF_KEY_SCHEDULES_CHECKSUM, cs);
+  g_prefs.putUInt(schedulesChecksumKey(relayIndex), cs);
 }
 
-static void enqueueRelayStateWrite(bool state) {
+static void enqueueRelayStateWrite(uint8_t relayIndex, bool state) {
   portENTER_CRITICAL(&g_relayPendingMux);
-  g_relayPendingRtdbState = state;
-  g_relayPendingRtdbChange = true;
+  g_relayPendingRtdbState[relayIndex] = state;
+  g_relayPendingRtdbChange[relayIndex] = true;
   portEXIT_CRITICAL(&g_relayPendingMux);
 }
 
-static bool consumePendingRelayWrite(bool& outState) {
+static bool consumePendingRelayWrite(uint8_t relayIndex, bool& outState) {
   bool pending = false;
   portENTER_CRITICAL(&g_relayPendingMux);
-  if (g_relayPendingRtdbChange) {
-    outState = g_relayPendingRtdbState;
-    g_relayPendingRtdbChange = false;
+  if (g_relayPendingRtdbChange[relayIndex]) {
+    outState = g_relayPendingRtdbState[relayIndex];
+    g_relayPendingRtdbChange[relayIndex] = false;
     pending = true;
   }
   portEXIT_CRITICAL(&g_relayPendingMux);
@@ -579,20 +687,24 @@ static void processPendingRelayWrite() {
   if (WiFi.status() != WL_CONNECTED || !Firebase.ready()) {
     return;
   }
-  bool nextState = false;
-  if (!consumePendingRelayWrite(nextState)) {
-    return;
-  }
+  for (uint8_t relayIndex = 0; relayIndex < 2; ++relayIndex) {
+    bool nextState = false;
+    if (!consumePendingRelayWrite(relayIndex, nextState)) {
+      continue;
+    }
 
-  const String path = composeRelayStatePath() + "/" + RTDB_PATH_RELAY_STATE_KEY;
-  if (!Firebase.RTDB.setBool(&fbWrite, path.c_str(), nextState)) {
-    Serial.printf("[FB] Pending relay write gagal: %s\n",
-                  fbWrite.errorReason().c_str());
-    enqueueRelayStateWrite(nextState);
-    return;
+    const String path = composeRelayStatePath(relayIndex) + "/" + RTDB_PATH_RELAY_STATE_KEY;
+    if (!Firebase.RTDB.setBool(&fbWrite, path.c_str(), nextState)) {
+      Serial.printf("[FB] Pending relay_%u write gagal: %s\n",
+                    relayIndex + 1,
+                    fbWrite.errorReason().c_str());
+      enqueueRelayStateWrite(relayIndex, nextState);
+      continue;
+    }
+    Serial.printf("[FB] Relay_%u schedule push: %s -> RTDB\n",
+                  relayIndex + 1,
+                  nextState ? "ON" : "OFF");
   }
-  Serial.printf("[FB] Relay schedule push: %s -> RTDB\n",
-                nextState ? "ON" : "OFF");
 }
 
 // =============================================================================
@@ -610,34 +722,36 @@ static void evaluateSchedulesNow(const struct tm& nowLocal) {
     return; // jangan blokir hardware task lama
   }
 
-  bool fired = false;
-  bool target = g_relayCurrentState;
-  for (uint8_t i = 0; i < g_scheduleCount; ++i) {
-    const LocalSchedule& s = g_schedules[i];
-    if (!s.isActive) continue;
-    int onKey  = s.onHour  * 60 + s.onMinute;
-    int offKey = s.offHour * 60 + s.offMinute;
-    if (minuteKey == onKey) {
-      target = true;
-      fired  = true;
-      break;
+  for (uint8_t relayIndex = 0; relayIndex < 2; ++relayIndex) {
+    bool fired = false;
+    bool target = g_relayCurrentState[relayIndex];
+    for (uint8_t i = 0; i < g_scheduleCount[relayIndex]; ++i) {
+      const LocalSchedule& s = g_schedules[relayIndex][i];
+      if (!s.isActive) continue;
+      int onKey  = s.onHour  * 60 + s.onMinute;
+      int offKey = s.offHour * 60 + s.offMinute;
+      if (minuteKey == onKey) {
+        target = true;
+        fired  = true;
+        break;
+      }
+      if (minuteKey == offKey) {
+        target = false;
+        fired  = true;
+        break;
+      }
     }
-    if (minuteKey == offKey) {
-      target = false;
-      fired  = true;
-      break;
+
+    if (fired && target != g_relayCurrentState[relayIndex]) {
+      Serial.printf("[SCHED] Eksekusi alarm -> relay_%u = %s\n",
+                    relayIndex + 1, target ? "ON" : "OFF");
+      markRelayChangePending(relayIndex, target);
+      // Jangan tulis RTDB langsung dari Core 1. Queue ke NetworkTask agar
+      // library Firebase hanya diakses dari satu task saja.
+      enqueueRelayStateWrite(relayIndex, target);
     }
   }
   xSemaphoreGive(g_schedulesMutex);
-
-  if (fired && target != g_relayCurrentState) {
-    Serial.printf("[SCHED] Eksekusi alarm -> relay = %s\n",
-                  target ? "ON" : "OFF");
-    markRelayChangePending(target);
-    // Jangan tulis RTDB langsung dari Core 1. Queue ke NetworkTask agar
-    // library Firebase hanya diakses dari satu task saja.
-    enqueueRelayStateWrite(target);
-  }
 }
 
 // =============================================================================
